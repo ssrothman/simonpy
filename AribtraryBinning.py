@@ -1207,7 +1207,7 @@ class ArbitraryBinning:
                                 fluxes : np.ndarray, 
                                 shapes : np.ndarray,
                                 cov : np.ndarray, 
-                                axes : List[str]) -> Tuple[np.ndarray, np.ndarray, 'ArbitraryBinning']:
+                                axes : List[str]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         '''
         Get covariance of fluxes and shapes as returned by get_fluxes_shapes()
         
@@ -1217,7 +1217,7 @@ class ArbitraryBinning:
         :param axes: List of axes along which to take fluxes and shapes
         :type axes: List[str]
         :return: (covflux, covshape, covfluxshape)
-        :rtype: Tuple[ndarray[_AnyShape, dtype[Any]], ndarray[_AnyShape, dtype[Any]], ArbitraryBinning]
+        :rtype: Tuple[ndarray[_AnyShape, dtype[Any]], ndarray[_AnyShape, dtype[Any]], ndarray[_AnyShape, dtype[Any]]]
         '''
         blocks = self.get_blocks(axes)
         Nflux = len(fluxes)
