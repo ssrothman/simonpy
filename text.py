@@ -1,6 +1,20 @@
 import re
 from typing import List, Union
 
+def clean_string(s : str) -> str:
+    s = s.strip()
+    s = strip_units(s)
+    if '$' in s:
+        # keep only the part between the first and last dollar signs
+        first_dollar = s.index('$')
+        last_dollar = s.rindex('$')
+        s = s[first_dollar+1:last_dollar]
+    else:
+        s = '\\text{' + s + '}'
+        
+    s = strip_dollar_signs(s)
+    return s
+
 def strip_units(s: str) -> str:
     if '[' in s and ']' in s:
         start = s.index('[')
