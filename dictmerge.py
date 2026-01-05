@@ -2,6 +2,38 @@
 from typing import Sequence
 
 
+def accumulate_dict(original : dict, update : dict) -> dict:
+    for key in original:
+        if key not in update:
+            raise RuntimeError("key %s in original but not in update!"%key)
+        
+    for key in update:
+        if key not in original:
+            raise RuntimeError("key %s in update but not in original!"%key)
+        
+    for key in original:
+        if isinstance(original[key], dict):
+            original[key] = accumulate_dict(original[key], update[key])
+        elif isinstance(original[key], str):
+            original[key] = update[key]
+        elif isinstance(original[key], int) or isinstance(original[key], float):
+            original[key] += update[key]
+        elif isinstance(original[key], list) or isinstance(original[key], tuple):
+            # assume all entries in the list are the same type
+            if isinstance(original[key][0], dict):
+                original[key] = [accumulate_dict(a, b) for a, b in zip(original[key], update[key])]
+            elif isinstance(original[key][0], str):
+                original[key] = update[key] #overwrite strings
+            elif isinstance(original[key][0], int) or isinstance(original[key][0], float):
+                original[key] = [a + b for a, b in zip(original[key], update[key])]
+            else:
+                raise TypeError("Unrecognized type in accumulate_dict(): List[%s]"%type(original[key][0]))
+        else:
+            raise TypeError("Unrecognized type in accumulate_dict(): %s"%type(original[key]))
+        
+    return original
+            
+
 def merge_dict(original : dict, update : dict, allow_new_keys : bool, replace_dict : Sequence[str] = []) -> dict:
     '''
     Recursively merges two dictionaries, overwriting values in the original dict with those from the update dict.
