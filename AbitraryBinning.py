@@ -656,6 +656,18 @@ class ArbitraryBinning:
         self._axis_names : List[str] = []
         self._Nax : int = 0
 
+    def __eq__(self, other) -> bool:
+        if self.Nax != other.Nax:
+            return False
+        if self.axis_names != other.axis_names:
+            return False
+        if len(self._blocks) != len(other._blocks):
+            return False
+        for i in range(len(self._blocks)):
+            if self._blocks[i] != other._blocks[i]:
+                return False
+        return True
+
     @property
     def single_block(self) -> bool:
         '''
@@ -1487,6 +1499,9 @@ class ArbitraryGenRecoBinning:
         '''
         self._genbinning : ArbitraryBinning = ArbitraryBinning()
         self._recobinning : ArbitraryBinning = ArbitraryBinning()
+
+    def __eq__(self, other) -> bool:
+        return self._genbinning == other._genbinning and self._recobinning == other._recobinning
 
     @property
     def genbinning(self):
