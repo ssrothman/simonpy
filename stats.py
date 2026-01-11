@@ -113,7 +113,7 @@ def regularized_inverse(matrix, l, force_positive=True, wrt_corr=True):
 
     regmat = np.where(C < l, 0, C)
 
-    _, inverse, _ = inverse_and_eigenspectrum(
+    _, inverse, _ = inverse_and_eigenspectrum( # pyright: ignore[reportAssignmentType]
         regmat, 
         clip_lowest_N=0,
         force_positive=False,
@@ -122,7 +122,7 @@ def regularized_inverse(matrix, l, force_positive=True, wrt_corr=True):
     )
 
     if wrt_corr:
-        inverse = np.diag(inverr) @ inverse @ np.diag(inverr)
+        inverse = np.diag(inverr) @ inverse @ np.diag(inverr) # pyright: ignore[reportPossiblyUnboundVariable]
 
     return inverse
 
@@ -149,14 +149,14 @@ def inverse_and_eigenspectrum(matrix,
 
     print("Inverting...")
     if return_sqrt:
-        inverse, reconstructed, sqrt_inverse, sqrt_reconstructed = inverse_from_eigenspectrum(
+        inverse, reconstructed, sqrt_inverse, sqrt_reconstructed = inverse_from_eigenspectrum( # pyright: ignore[reportAssignmentType]
             solver, 
             clip_lowest_N=clip_lowest_N,
             force_positive=force_positive,
             return_sqrt=True
         )
     else:
-        inverse, reconstructed = inverse_from_eigenspectrum(
+        inverse, reconstructed = inverse_from_eigenspectrum( # type: ignore
             solver, 
             clip_lowest_N=clip_lowest_N,
             force_positive=force_positive,
@@ -164,14 +164,14 @@ def inverse_and_eigenspectrum(matrix,
         )
 
     if wrt_corr:
-        inverse = np.diag(inverr) @ inverse @ np.diag(inverr)
-        reconstructed = np.diag(err) @ reconstructed @ np.diag(err)
+        inverse = np.diag(inverr) @ inverse @ np.diag(inverr) # type: ignore
+        reconstructed = np.diag(err) @ reconstructed @ np.diag(err) # type: ignore
         if return_sqrt:
-            sqrt_inverse = np.diag(inverr) @ sqrt_inverse 
-            sqrt_reconstructed = np.diag(err) @ sqrt_reconstructed 
+            sqrt_inverse = np.diag(inverr) @ sqrt_inverse  # type: ignore
+            sqrt_reconstructed = np.diag(err) @ sqrt_reconstructed  # type: ignore
 
     if return_sqrt:
-        return solver, inverse, reconstructed, sqrt_inverse, sqrt_reconstructed
+        return solver, inverse, reconstructed, sqrt_inverse, sqrt_reconstructed # type: ignore
     else:
         return solver, inverse, reconstructed
 
@@ -209,16 +209,16 @@ def inverse_from_eigenspectrum(solver,
 
 def get_chi2(vals1, vals2, cov1, cov2, binning=None, cut=None, normalize=False):
     if normalize:
-        vals1, cov1 = normalize_distribution(vals1, cov1)
-        vals2, cov2 = normalize_distribution(vals2, cov2)
+        vals1, cov1 = normalize_distribution(vals1, cov1) # type: ignore
+        vals2, cov2 = normalize_distribution(vals2, cov2) # type: ignore
 
     covdiff = cov1 + cov2
     diff = vals1 - vals2
 
     if cut is not None:
-        diff = binning.get_slice(diff.T, **cut).T
-        covdiff = binning.get_slice(covdiff.T, **cut)
-        covdiff = binning.get_slice(covdiff.T, **cut)
+        diff = binning.get_slice(diff.T, **cut).T # type: ignore
+        covdiff = binning.get_slice(covdiff.T, **cut) # type: ignore
+        covdiff = binning.get_slice(covdiff.T, **cut) # type: ignore
 
     #_, invcov, _ = inverse_and_eigenspectrum(
     #        covdiff,
@@ -270,8 +270,8 @@ def normalize_distribution(vals, cov, return_N = False):
         return result_vals, result_cov
 
 def conormalize_distributions(vals1, cov1, vals2, cov2, cov12):
-    result_vals1, result_cov1, N1 = normalize_distribution(vals1, cov1, return_N=True)
-    result_vals2, result_cov2, N2 = normalize_distribution(vals2, cov2, return_N=True)
+    result_vals1, result_cov1, N1 = normalize_distribution(vals1, cov1, return_N=True) # type: ignore
+    result_vals2, result_cov2, N2 = normalize_distribution(vals2, cov2, return_N=True) # type: ignore
 
     if cov12 is not None:
         sumcov_dim0 = np.sum(cov12, axis=0)
@@ -315,7 +315,7 @@ def product_distribution(vals1, cov1, vals2, cov2, cov12):
 
     result_cov = np.outer(vals1, vals1) * cov2 + np.outer(vals2, vals2) * cov1 
     if cov12 is not None:
-        term = np.outer(vall2, vals1) * cov12
+        term = np.outer(vals2, vals1) * cov12 
         result_cov += term + term.T
 
     return result_vals, result_cov
@@ -391,20 +391,20 @@ def flux_and_shape_covariance(data, covyy, covty, binning, axes):
         for a, blockA in enumerate(blocks):
             sliceA = blockA['slice']
 
-            covtflux[:, a] = np.sum(covty[:, sliceA], axis=1)
+            covtflux[:, a] = np.sum(covty[:, sliceA], axis=1) # type: ignore
 
         #covtshapes
         for a, blockA in enumerate(blocks):
             sliceA = blockA['slice']
 
-            covtshapes[:, sliceA] += covty[:, sliceA] / fluxes[a]
-            covtshapes[:, sliceA] -= np.outer(np.sum(covty[:, sliceA], axis=1),
+            covtshapes[:, sliceA] += covty[:, sliceA] / fluxes[a] # type: ignore
+            covtshapes[:, sliceA] -= np.outer(np.sum(covty[:, sliceA], axis=1), # type: ignore
                                               shapes[sliceA] / fluxes[a])
     else:
         covtflux = None
         covtshapes = None
 
-    return fluxes, shapes, covflux, covshapes, covfluxshape, covtflux, covtshapes, fluxbinning
+    return fluxes, shapes, covflux, covshapes, covfluxshape, covtflux, covtshapes, fluxbinning # type: ignore
 
 def compute_flux(vals, cov, binning, ptslice, Rslice, 
                  normalize=True, jacobian=True):
@@ -416,7 +416,7 @@ def compute_flux(vals, cov, binning, ptslice, Rslice,
     c_edges = np.asarray(block.ax_details['c']['edges'])
 
     if normalize:
-        flux, covflux = normalize_distribution(flux, covflux)
+        flux, covflux = normalize_distribution(flux, covflux) # type: ignore
 
     if jacobian:
         jac = 0.5 * (r_edges[1:]**2 - r_edges[:-1]**2)[:, None] \
@@ -480,6 +480,6 @@ def radial_slice_flux(vals, cov, binning, ptslice, Rslice, rbin,
     print(fluxsum.shape)
     print(covsum.shape)
 
-    fluxsum, covsum = normalize_distribution(fluxsum, covsum)
+    fluxsum, covsum = normalize_distribution(fluxsum, covsum) # type: ignore
 
     return fluxsum, covsum, r_edges, c_edges
