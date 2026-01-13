@@ -1,5 +1,4 @@
 from typing import Literal, overload
-import fasteigenpy as eigen
 import numpy as np
 
 @overload
@@ -11,6 +10,8 @@ def smart_inverse(matrix : np.ndarray, return_eigenspectrum : Literal[False]) ->
     ...
 
 def smart_inverse(matrix : np.ndarray, return_eigenspectrum : bool):
+    import fasteigenpy as eigen
+    
     err = np.sqrt(np.diag(matrix))
     err[err==0] = 1.0 # prevent division by zero
     inverr = 1.0 / err
