@@ -4,7 +4,7 @@ import itertools
 import json
 import os
 import hist
-from typing import List, Union, Tuple
+from typing import List, Sequence, Union, Tuple
 
 class _BinningBlock:
     '''
@@ -1053,6 +1053,36 @@ class ArbitraryBinning:
 
         return newbinning
     
+    def remove_flow_bins(self, clipaxes : Sequence[str]) -> 'ArbitraryBinning':
+        '''
+        Remove flow bins in the specified axes, returning a new ArbitraryBinning without those bins.
+        "flow bins" are bins with non-finite edges.
+        '''
+        newbinning = self.copy()
+        running_offset = 0
+        for block in newbinning._blocks:
+            for axisname in clipaxes:
+                if axisname in block.axis_names:
+                    edges = block.ax_details[axisname]['edges']
+
+                    new_edges = [edge for edge in edges if np.isfinite(edge)]
+                    if len(new_edges) < 2:
+                        raise ValueError(f"Cannot remove flow bins from axis {axisname} because all edges are non-finite.")
+                    new_extent = len(new_edges) - 1
+
+                    block.ax_details[axisname]['edges'] = new_edges
+                    block.ax_details[axisname]['extent'] = new_extent
+                    block.ax_details[axisname]['minedge'] = new_edges[0]
+                    block.ax_details[axisname]['maxedge'] = new_edges[-1]
+            
+            block.extents = [block.ax_details[name]['extent'] for name in block.axis_names]
+            block.total_size = int(np.prod(block.extents))
+            block.calculate_strides()
+            block.offset = running_offset
+            running_offset += block.total_size
+
+        return newbinning
+
     def project_out(self, data : np.ndarray, axis_name: str) -> Tuple[np.ndarray, 'ArbitraryBinning']:
         '''
         Project out an axis from the data, returning the projected data and a new ArbitraryBinning representing the new binning structure.
