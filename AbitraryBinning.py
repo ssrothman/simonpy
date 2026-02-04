@@ -1288,8 +1288,9 @@ class ArbitraryBinning:
             for b, blockB in enumerate(blocks):
                 sliceB = blockB['slice']
                 
-                covfluxshape[a, sliceB] += np.sum(cov[sliceA, sliceB], axis=0) / fluxes[b]
-                covfluxshape[a, sliceB] -= (shapes[sliceB]/fluxes[b])  * np.sum(cov[sliceA, :][:, sliceB], axis=None)
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    covfluxshape[a, sliceB] += np.sum(cov[sliceA, sliceB], axis=0) / fluxes[b]
+                    covfluxshape[a, sliceB] -= (shapes[sliceB]/fluxes[b])  * np.sum(cov[sliceA, :][:, sliceB], axis=None)
 
         #covshape
         for a, blockA in enumerate(blocks):
@@ -1298,12 +1299,13 @@ class ArbitraryBinning:
             for b, blockB in enumerate(blocks):
                 sliceB = blockB['slice']
 
-                covshapes[sliceA, :][:, sliceB] += cov[sliceA, :][:, sliceB] / (fluxes[a] * fluxes[b])
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    covshapes[sliceA, :][:, sliceB] += cov[sliceA, :][:, sliceB] / (fluxes[a] * fluxes[b])
 
-                covshapes[sliceA, :][:, sliceB] += (np.outer(shapes[sliceA], shapes[sliceB]) / (fluxes[a] * fluxes[b])) * np.sum(cov[sliceA, :][:, sliceB], axis=None)
+                    covshapes[sliceA, :][:, sliceB] += (np.outer(shapes[sliceA], shapes[sliceB]) / (fluxes[a] * fluxes[b])) * np.sum(cov[sliceA, :][:, sliceB], axis=None)
 
-                covshapes[sliceA, :][:, sliceB] -= np.outer(shapes[sliceA]/(fluxes[a] * fluxes[b]), np.sum(cov[sliceA, :][:, sliceB], axis=0))
-                covshapes[sliceA, :][:, sliceB] -= np.outer(np.sum(cov[sliceA, :][:, sliceB], axis=1), shapes[sliceB]/(fluxes[a] * fluxes[b]))
+                    covshapes[sliceA, :][:, sliceB] -= np.outer(shapes[sliceA]/(fluxes[a] * fluxes[b]), np.sum(cov[sliceA, :][:, sliceB], axis=0))
+                    covshapes[sliceA, :][:, sliceB] -= np.outer(np.sum(cov[sliceA, :][:, sliceB], axis=1), shapes[sliceB]/(fluxes[a] * fluxes[b]))
 
         return covflux, covshapes, covfluxshape
 
@@ -1347,7 +1349,8 @@ class ArbitraryBinning:
             #else:
             fluxes[i] = np.sum(data[indexing])
 
-            shapes[indexing] = data[indexing]/fluxes[i]
+            with np.errstate(divide='ignore', invalid='ignore'):
+                shapes[indexing] = data[indexing]/fluxes[i]
 
             binningblock = _BinningBlock()
             binningblock.Nax = len(axes)
