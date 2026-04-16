@@ -107,19 +107,9 @@ def normalize_per_block(val : np.ndarray, cov : np.ndarray | None, binning : Arb
     else:
         return shapes
 
-@overload
-def smart_inverse(matrix : np.ndarray, return_eigenspectrum : Literal[True]) -> tuple[np.ndarray, np.ndarray]:
-    ...
-
-@overload
-def smart_inverse(matrix : np.ndarray, return_eigenspectrum : Literal[False]) -> np.ndarray:
-    ...
-
-def smart_inverse(matrix : np.ndarray, return_eigenspectrum : bool):
+def _transform_and_decompose(matrix : np.ndarray):
     import fasteigenpy as eigen
 
-    print("Calling smart_inverse")
-    
     err = np.sqrt(np.diag(matrix))
     err[err==0] = 1.0 # prevent division by zero
     inverr = 1.0 / err
@@ -134,6 +124,19 @@ def smart_inverse(matrix : np.ndarray, return_eigenspectrum : bool):
     
     eigvals = np.asarray(solver.eigenvalues()).copy()
     eigvecs = np.asarray(solver.eigenvectors())
+
+    return corr, err, inverr, eigvals, eigvecs
+
+@overload
+def smart_inverse(matrix : np.ndarray, return_eigenspectrum : Literal[True]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ...
+
+@overload
+def smart_inverse(matrix : np.ndarray, return_eigenspectrum : Literal[False]) -> np.ndarray:
+    ...
+
+def smart_inverse(matrix : np.ndarray, return_eigenspectrum : bool):
+    corr, err, inverr, eigvals, eigvecs = _transform_and_decompose(matrix)
     
     eigvals[eigvals < 0] = 0.0 # clip negative eigenvalues
 
@@ -143,10 +146,52 @@ def smart_inverse(matrix : np.ndarray, return_eigenspectrum : bool):
     
     inverse = eigvecs @ np.diag(inveigvals) @ eigvecs.T
 
-    # inverse is currently the inverse of the correlation matrix. We need to convert it back to the inverse of the covariance matrix
+    # inverse is currently the inverse of the correlation matrix. 
+    # We need to convert it back to the inverse of the covariance matrix
     inverse = np.diag(inverr) @ inverse @ np.diag(inverr)
 
     if return_eigenspectrum:
-        return inverse, eigvals
+        return inverse, eigvals, eigvecs
     else:
         return inverse
+    
+def smart_sqrt(matrix : np.ndarray):
+    corr, err, inverr, eigvals, eigvecs = _transform_and_decompose(matrix)
+
+    eigvals[eigvals < 0] = 0.0 # clip negative eigenvalues
+    
+    sqrt_eigvals = np.sqrt(eigvals)
+
+    denom = np.where(sqrt_eigvals == 0, 1, sqrt_eigvals) # prevent division by zero
+    sqrt_inv_eigvals = 1/denom
+    sqrt_inv_eigvals[sqrt_eigvals == 0] = 0.0 # set back to zero
+    print("min(sqrt_eigvals):", np.min(sqrt_eigvals))
+    print("max(sqrt_eigvals):", np.max(sqrt_eigvals))
+    print("min(sqrt_inv_eigvals):", np.min(sqrt_inv_eigvals))
+    print("max(sqrt_inv_eigvals):", np.max(sqrt_inv_eigvals))
+
+    L = eigvecs @ np.diag(sqrt_eigvals)
+    Linv = eigvecs @ np.diag(sqrt_inv_eigvals)
+
+    # L is currently the sqrt of the correlation matrix. 
+    # We need to convert it back to the sqrt of the covariance matrix
+    L = np.diag(err) @ L
+    Linv = np.diag(inverr) @ Linv
+
+    return L, Linv
+
+def multivariate_gaussian_rvs(mu, L, Nsamples):
+    standard_normal = np.random.normal(size=(mu.shape[0], Nsamples))
+
+    result = (mu[:, None] + L @ standard_normal).T
+
+    # test
+    result_diff = result - mu[None, :]
+    cov_estimate = result_diff.T @ result_diff / (Nsamples - 1)
+    print()
+    print("Estimated covariance from samples:", cov_estimate.sum())
+    print("Original covariance from L:", (L @ L.T).sum())
+    print("L.sum()", L.sum())
+    print()
+
+    return result

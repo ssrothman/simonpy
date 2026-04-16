@@ -97,11 +97,6 @@ def nuisance_impact(x, invhess, whichnuisance):
 
     return xshift, H11shift, x1 + xshift, H11 + H11shift
 
-def multivariate_gaussian_rvs(mu, L, Nsamples):
-    standard_normal = np.random.normal(size=(mu.shape[0], Nsamples))
-
-    return (mu[:, None] + L @ standard_normal).T
-
 def regularized_inverse(matrix, l, force_positive=True, wrt_corr=True):
     if wrt_corr:
         err = np.sqrt(np.diag(matrix))
