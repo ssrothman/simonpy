@@ -91,6 +91,31 @@ def apply_jacobian(val : np.ndarray | None, cov : np.ndarray | None, binning : A
 
 
 @overload
+def divide_out_profile(val : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning, axes : List[str]) -> tuple[np.ndarray, np.ndarray]:
+    ...
+
+@overload
+def divide_out_profile(val : np.ndarray, cov : None, binning : ArbitraryBinning, axes : List[str]) -> np.ndarray:
+    ...
+
+def divide_out_profile(val : np.ndarray, cov : np.ndarray | None, binning : ArbitraryBinning, axes : List[str]):
+    fluxes, shapes, _ = binning.get_fluxes_shapes(val, axes)
+    blocks = binning.get_blocks(axes)
+    lenfactor = np.empty_like(shapes)
+    for block in blocks:
+        shapeblock = shapes[block['slice']]
+        lenfactor[block['slice']] = len(shapeblock)
+    
+    shapes *= lenfactor
+    
+    if cov is not None:
+        _, covshapes, _ = binning.get_fluxes_shapes_cov2d(fluxes, shapes, cov, axes)
+        covshapes *= np.outer(lenfactor, lenfactor)
+        return shapes, covshapes
+    else:
+        return shapes
+
+@overload
 def normalize_per_block(val : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning, axes : List[str]) -> tuple[np.ndarray, np.ndarray]:
     ...
 
