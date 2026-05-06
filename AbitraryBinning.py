@@ -156,6 +156,26 @@ class _BinningBlock:
 
         self.calculate_strides()
 
+    def rename_axis(self, oldname : str, newname : str) -> None:
+        '''
+        Rename an axis in this block. This is a mutating operation.
+        
+        :param self: This object
+        :param oldname: The current name of the axis to rename
+        :type oldname: str
+        :param newname: The new name for the axis
+        :type newname: str
+        '''
+        if oldname not in self.axis_names:
+            raise ValueError(f"Axis {oldname} not found in block.")
+
+        if newname in self.axis_names:
+            raise ValueError(f"Axis {newname} already exists in block.")
+
+        idx = self.axis_names.index(oldname)
+        self.axis_names[idx] = newname
+        self.ax_details[newname] = self.ax_details.pop(oldname)
+
     def calculate_strides(self):
         '''
         Calculate the strides for each axis in the binning block.
@@ -667,6 +687,28 @@ class ArbitraryBinning:
             if self._blocks[i] != other._blocks[i]:
                 return False
         return True
+
+    def rename_axis(self, oldname : str, newname : str) -> None:
+        '''
+        Rename an axis in this ArbitraryBinning. This is a mutating operation.
+        
+        :param self: This object
+        :param oldname: The current name of the axis to rename
+        :type oldname: str
+        :param newname: The new name for the axis
+        :type newname: str
+        '''
+        if oldname not in self._axis_names:
+            raise ValueError(f"Axis {oldname} not found in ArbitraryBinning.")
+
+        if newname in self._axis_names:
+            raise ValueError(f"Axis {newname} already exists in ArbitraryBinning.")
+
+        idx = self._axis_names.index(oldname)
+        self._axis_names[idx] = newname
+
+        for block in self._blocks:
+            block.rename_axis(oldname, newname)
 
     @property
     def single_block(self) -> bool:
