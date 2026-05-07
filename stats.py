@@ -19,7 +19,6 @@ def marginalize(x, invhess, slice_start, slice_end):
     newhess = np.concatenate((before_dim1, after_dim1), axis=1)
 
     newx = np.concatenate((x[:slice_start], x[slice_end:]), axis=0)
-
     return newx, newhess
 
 
@@ -32,7 +31,6 @@ def condition(x, invhess, slice_start, slice_end, values):
     If we conditionally set a nuisance to zero that's 
     equivalent to if we never had it, up to the gaussian assumption
     '''
-    print("Conditioning...")
     xkeep = np.concatenate((x[:slice_start], x[slice_end:]), axis=0)
     xkill = x[slice_start:slice_end]
 
@@ -47,14 +45,9 @@ def condition(x, invhess, slice_start, slice_end, values):
     H12 = Htmp0[:, slice_start:slice_end]
     H22 = invhess[slice_start:slice_end, slice_start:slice_end]
 
-    print("H11 shape:", H11.shape)
-    print("H12 shape:", H12.shape)
-    print("H22 shape:", H22.shape)
-
     codH22 = eigen.CompleteOrthogonalDecomposition(H22)
 
     solved = codH22.solve(values - xkill)
-    print("solved shape:", solved.shape)
     if len(xkill) == 1:
         newx = xkeep + H12.squeeze() * codH22.solve(values - xkill).squeeze()
     else:
