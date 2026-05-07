@@ -4,7 +4,7 @@ import itertools
 import json
 import os
 import hist
-from typing import List, Sequence, Union, Tuple
+from typing import List, Literal, Sequence, Union, Tuple
 
 class _BinningBlock:
     '''
@@ -676,6 +676,10 @@ class ArbitraryBinning:
         self._axis_names : List[str] = []
         self._Nax : int = 0
 
+        # for categorical axes
+        # format is {axis_name : {bin_index : label}}
+        self._label_lookup : dict | None = None #
+
     def __eq__(self, other) -> bool:
         if self.Nax != other.Nax:
             return False
@@ -686,6 +690,8 @@ class ArbitraryBinning:
         for i in range(len(self._blocks)):
             if self._blocks[i] != other._blocks[i]:
                 return False
+        if self._label_lookup != other._label_lookup:
+            return False
         return True
 
     def rename_axis(self, oldname : str, newname : str) -> None:
@@ -704,11 +710,34 @@ class ArbitraryBinning:
         if newname in self._axis_names:
             raise ValueError(f"Axis {newname} already exists in ArbitraryBinning.")
 
+        if self._label_lookup is not None and newname in self._label_lookup:
+            self._label_lookup[newname] = self._label_lookup.pop(oldname)
+
         idx = self._axis_names.index(oldname)
         self._axis_names[idx] = newname
 
         for block in self._blocks:
             block.rename_axis(oldname, newname)
+
+    def setup_label_lookup(self, label_lookup : dict):
+        '''
+        Allows use of categorical axes by providing a mapping from bins to labels
+        This is a mutating operation
+        '''
+        self._label_lookup = label_lookup
+
+    def label_lookup(self) -> dict | None:
+        '''
+        Get the label lookup dictionary for categorical axes, if it exists
+        
+        :param self: This object
+        :return: The label lookup dictionary, or None if it has not been set up
+        :rtype: dict | None
+        '''
+        if self._label_lookup is None or self._label_lookup == {}:
+            return None
+        else:
+            return self._label_lookup
 
     @property
     def single_block(self) -> bool:
@@ -844,6 +873,8 @@ class ArbitraryBinning:
         resultdict = {}
         resultdict['axis_names'] = self._axis_names
         resultdict['Nax'] = self._Nax
+        if self._label_lookup is not None:
+            resultdict['label_lookup'] = self._label_lookup
         resultdict['blocks'] = []
         for block in self._blocks:
             resultdict['blocks'].append(block.to_dict())
@@ -864,7 +895,12 @@ class ArbitraryBinning:
             block = _BinningBlock()
             block.from_dict(blockdata)
             self._blocks.append(block)
-        
+
+        if 'label_lookup' in resultdict:
+            self._label_lookup = resultdict['label_lookup']
+        else:
+            self._label_lookup = None
+
     def _get_edges(self, lower: bool =True) -> dict:
         '''
         Get the bin edges for all axes in this ArbitraryBinning
@@ -1085,6 +1121,10 @@ class ArbitraryBinning:
             if len(unique_edges[name]) <= 2: #then this axis is degenerate and can be REMOVED
                 newbinning._axis_names.remove(name)
                 newbinning._Nax -= 1
+
+                if newbinning._label_lookup is not None and name in newbinning._label_lookup:
+                    del newbinning._label_lookup[name]
+
                 for block in newbinning._blocks:
                     offending_index = block.axis_names.index(name)
                     block.extents.pop(offending_index)
@@ -1188,6 +1228,13 @@ class ArbitraryBinning:
         if not np.isclose(startsum, endsum):
             raise ValueError(f"Projection changed the sum of the data: {startsum} -> {endsum}")
 
+
+        if self._label_lookup is not None and axis_name in self._label_lookup:
+            newbinning._label_lookup = self._label_lookup.copy()
+            del newbinning._label_lookup[axis_name]
+        else:
+            newbinning._label_lookup = None
+
         return result, newbinning
 
     def project_out_cov2d(self, data : np.ndarray, axis_name: str) -> Tuple[np.ndarray, 'ArbitraryBinning']:
@@ -1262,7 +1309,12 @@ class ArbitraryBinning:
         newbinning._blocks = self._blocks[0].rebin(rebinning_spec)
         newbinning._axis_names = self._axis_names
         newbinning._Nax = self._Nax
-            
+        
+        if self._label_lookup is not None:
+            newbinning._label_lookup = self._label_lookup.copy()
+        else:
+            newbinning._label_lookup = None
+
         endsum = result.sum(axis=None)
 
         if not np.isclose(startsum, endsum):
@@ -1609,6 +1661,19 @@ class ArbitraryGenRecoBinning:
         result.from_dict(self.to_dict())
         return result
 
+    def setup_from_binnings(self, recobinning : ArbitraryBinning, genbinning : ArbitraryBinning):
+        '''
+        Initialize from a pair of ArbitraryBinning objects
+        
+        :param self: This object
+        :param genbinning: Generator-level binning
+        :type genbinning: ArbitraryBinning
+        :param recobinning: Reconstruction-level binning
+        :type recobinning: ArbitraryBinning
+        '''
+        self._genbinning = genbinning.copy()
+        self._recobinning = recobinning.copy()
+
     def setup_from_histograms(self, Hreco : hist.Hist, Hgen : hist.Hist):
         '''
         Initialize from a pair of hist.Hist objects
@@ -1901,3 +1966,35 @@ class ArbitraryGenRecoBinning:
         newbinning._recobinning = newbinning_reco
 
         return result, newbinning
+
+    def setup_label_lookup(self, genreco : Literal['gen', 'reco'], label_lookup : dict):
+        '''
+        Allows use of categorical axes by providing a mapping from bins to labels
+        This is a mutating operation
+        '''
+        if genreco.lower().strip() == 'gen':
+            thebinning = self.genbinning
+        elif genreco.lower().strip() == 'reco':
+            thebinning = self.recobinning
+        else:
+            raise ValueError("genreco must be 'gen' or 'reco'")
+
+        thebinning.setup_label_lookup(label_lookup)
+
+    def label_lookup(self, genreco : Literal['gen', 'reco']) -> dict | None:
+        '''
+        Get the label lookup dictionary for categorical axes, if it exists
+        
+        :param self: This object
+        :param genreco: Specify 'gen' for generator-level or 'reco' for reconstruction-level binning
+        :return: The label lookup dictionary, or None if it has not been set up
+        :rtype: dict | None
+        '''
+        if genreco.lower().strip() == 'gen':
+            thebinning = self.genbinning
+        elif genreco.lower().strip() == 'reco':
+            thebinning = self.recobinning
+        else:
+            raise ValueError("genreco must be 'gen' or 'reco'")
+        
+        return thebinning.label_lookup()
