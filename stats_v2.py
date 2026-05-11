@@ -190,10 +190,6 @@ def smart_sqrt(matrix : np.ndarray):
     denom = np.where(sqrt_eigvals == 0, 1, sqrt_eigvals) # prevent division by zero
     sqrt_inv_eigvals = 1/denom
     sqrt_inv_eigvals[sqrt_eigvals == 0] = 0.0 # set back to zero
-    print("min(sqrt_eigvals):", np.min(sqrt_eigvals))
-    print("max(sqrt_eigvals):", np.max(sqrt_eigvals))
-    print("min(sqrt_inv_eigvals):", np.min(sqrt_inv_eigvals))
-    print("max(sqrt_inv_eigvals):", np.max(sqrt_inv_eigvals))
 
     L = eigvecs @ np.diag(sqrt_eigvals)
     Linv = eigvecs @ np.diag(sqrt_inv_eigvals)
@@ -216,7 +212,6 @@ def multivariate_gaussian_rvs(mu, L, Nsamples):
     print()
     print("Estimated covariance from samples:", cov_estimate.sum())
     print("Original covariance from L:", (L @ L.T).sum())
-    print("L.sum()", L.sum())
     print()
 
     return result
