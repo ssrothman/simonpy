@@ -216,6 +216,9 @@ class _BinningBlock:
             edges = np.broadcast_to(edges, fullshape)
             result[name] = edges
         
+        for name in result:
+            result[name] = np.ravel(result[name])
+
         return result
 
     def rebin(self, rebinning_spec : Union[dict, str]) -> List['_BinningBlock']:
@@ -783,6 +786,65 @@ class ArbitraryBinning:
             result[name] = np.asarray(block.ax_details[name]['edges'])
             
         return result
+
+    def axis_edges(self, axis_name : str) -> np.ndarray:
+        '''
+        Get the bin edges for a specific axis in this ArbitraryBinning
+
+        If this binning is not rectangular in this axis then this method will raise an error,
+        since there is no well-defined set of edges for that axis.
+        
+        :param self: This object
+        :param axis_name: The name of the axis to get edges for
+        :type axis_name: str
+        :return: A numpy array of bin edges for the specified axis
+        :rtype: np.ndarray
+        '''
+        if len(self._blocks) == 0:
+            raise ValueError("No blocks in ArbitraryBinning.")
+
+        edges_accu = set()
+        min_so_far = +np.inf
+        max_so_far = -np.inf
+        for block in self._blocks:
+            if axis_name not in block.axis_names:
+                raise ValueError(f"Axis {axis_name} not found in block with axes {block.axis_names}.")
+
+            block_edges = block.ax_details[axis_name]['edges']
+
+            # we need to check if:
+            #   1) the block edges overlap with the edges we have seen so far
+            #   2) if they do overlap, that there are neither any new edges we have not seen yet in the overlapping region,
+            #      nor any edges we have seen before that are not in the block edges
+            # if either of these conditions is violated, then we cannot define a single set of edges
+            #   for this axis across the whole binning, and we should raise an error
+
+            block_min = block_edges[0]
+            block_max = block_edges[-1]
+
+            if block_max <= min_so_far or block_min >= max_so_far:
+                # no overlap, just add the new edges to the accu
+                edges_accu.update(block_edges)
+                min_so_far = min(min_so_far, block_min)
+                max_so_far = max(max_so_far, block_max)
+            else:
+                # there is overlap, check for consistency
+                for blockedge in block_edges:
+                    if blockedge <= max_so_far and blockedge >= min_so_far and blockedge not in edges_accu and len(edges_accu) > 0:
+                        raise ValueError("Binning is not rectangular in axis %s, cannot define a single set of edges." % axis_name)
+                for accuedge in edges_accu:
+                    if accuedge <= block_max and accuedge >= block_min and accuedge not in block_edges:
+                        raise ValueError("Binning is not rectangular in axis %s, cannot define a single set of edges." % axis_name)
+                
+                # if we get here, we have passed the consistency checks
+                edges_accu.update(block_edges)
+                min_so_far = min(min_so_far, block_min)
+                max_so_far = max(max_so_far, block_max)
+
+        # finally, covert to a sorted np.ndarray
+        edges_accu = np.asarray(list(edges_accu))
+        edges_accu.sort()
+        return edges_accu
 
     @property
     def axis_names(self) -> List[str]:
