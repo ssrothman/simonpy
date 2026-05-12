@@ -176,6 +176,30 @@ class _BinningBlock:
         self.axis_names[idx] = newname
         self.ax_details[newname] = self.ax_details.pop(oldname)
 
+    def clip_flow_bins(self, axis : str, negativeinf : float | None, positiveinf : float | None):
+        '''
+        Clip the flow bins along the specified axis to the provided values. This is a mutating operation.
+        
+        :param self: This object
+        :param axis: The name of the axis to clip flow bins along
+        :type axis: str
+        :param negativeinf: The value to which to clip the negative infinity flow bin, or None to leave it unchanged
+        :type negativeinf: float | None
+        :param positiveinf: The value to which to clip the positive infinity flow bin, or None to leave it unchanged
+        :type positiveinf: float | None
+        '''
+        if axis not in self.axis_names:
+            raise ValueError(f"Axis {axis} not found in block.")
+
+        edges = self.ax_details[axis]['edges']
+        if negativeinf is not None and np.isneginf(edges[0]):
+            edges[0] = negativeinf
+            self.ax_details[axis]['minedge'] = negativeinf
+
+        if positiveinf is not None and np.isposinf(edges[-1]):
+            edges[-1] = positiveinf
+            self.ax_details[axis]['maxedge'] = positiveinf
+
     def calculate_strides(self):
         '''
         Calculate the strides for each axis in the binning block.
@@ -681,7 +705,7 @@ class ArbitraryBinning:
 
         # for categorical axes
         # format is {axis_name : {bin_index : label}}
-        self._label_lookup : dict | None = None #
+        self._label_lookup : dict | None = None 
 
     def __eq__(self, other) -> bool:
         if self.Nax != other.Nax:
@@ -721,6 +745,21 @@ class ArbitraryBinning:
 
         for block in self._blocks:
             block.rename_axis(oldname, newname)
+
+    def clip_flow_bins(self, axis : str, negativeinf : float | None = None, positiveinf : float | None = None):
+        '''
+        Clip the flow bins along the specified axis to the provided values. This is a mutating operation.
+        
+        :param self: This object
+        :param axis: The name of the axis to clip flow bins along
+        :type axis: str
+        :param negativeinf: The value to which to clip the negative infinity flow bin, or None to leave it unchanged
+        :type negativeinf: float | None
+        :param positiveinf: The value to which to clip the positive infinity flow bin, or None to leave it unchanged
+        :type positiveinf: float | None
+        '''
+        for block in self._blocks:
+            block.clip_flow_bins(axis, negativeinf, positiveinf)
 
     def setup_label_lookup(self, label_lookup : dict):
         '''
@@ -1487,6 +1526,7 @@ class ArbitraryBinning:
         :rtype: Tuple[ndarray[Any, Any], ndarray[Any, Any], ArbitraryBinning]
         '''
         axisblocks = self.get_blocks(axes)
+
         #if type(data) is np.ndarray:
         shapes = np.ones(data.shape, dtype=data.dtype)
         fluxes = np.empty(len(axisblocks), dtype=data.dtype)
@@ -1594,7 +1634,6 @@ class ArbitraryBinning:
                                        axis=i)
         return theslice
 
-
     def get_blocks(self, axes : List[str]) -> List[dict]:
         '''
         Get the the indices corresonding to all slices along axes specified in `axes`.
@@ -1604,7 +1643,7 @@ class ArbitraryBinning:
 
         The format of the result is a list of dicts, each with format:
         {
-            'slice' : slice object or np.ndarray of indices,
+            'slice' : slice object specifying the indices of the block along the data axis,
             'edges' : dict of { axis_name : (min_edge, max_edge) } specifying the slice
         }
         
@@ -1617,61 +1656,56 @@ class ArbitraryBinning:
         :rtype: List[dict[Any, Any]]
         '''
 
-        #get full edge list across all blocks:
-        #1. get everything with repeats
-        global_edges = {name : [] for name in self._axis_names}
-        for name in self._axis_names:
-            for block in self._blocks:
-                global_edges[name] += block.ax_details[name]['edges']
-        #2. uniquify and sort
-        for name in self._axis_names:
-            global_edges[name] = sorted(list(set(global_edges[name])))
+        # the order low-key matters here...
+        # I guess we rely on the user to provide the axes in the right order
+        if not all(axis in self._axis_names for axis in axes):
+            raise ValueError("Requested axes not all present in binning!")
 
-        
-        result = []
+        # Step 1: get all the relevant edges
+        lower_edges = self.lower_edges()
+        upper_edges = self.upper_edges()
 
-        #the implementation here is a bit brute-force, but I think it works
+        # Step 2: iterate through edges until we enter a new block,
+        # recording the start and stop of each block
+        # and checking that all of the blocks are contiguous
+        blocks : List[slice] = []
+        blockedges : List[dict] = []
 
-        #list of all bin indices in every requested axis
-        ranges = [range(len(global_edges[name]) - 1) for name in axes]
-        #iterate over all slices along requested axes = cross-product of all bins per axis
-        for indices in itertools.product(*ranges):
-            #build a "slice" dict according to axis edges
-            theslice : dict = {}
-            for i, name in enumerate(axes):
-                theslice[name] = (global_edges[name][indices[i]], 
-                                  global_edges[name][indices[i] + 1])
-
-            #find all the flat indices corrdsponding to this slice
-            globalindices = np.empty((0,), dtype=np.int64)
-            for block in self._blocks:
-                #clip the slice to this block
-                blockslice : Union[dict, None] = block.clip_edges_to_block(theslice)
-                if blockslice is not None: #if clipped slice is non-empty
-                    #lookup indices from edges
-                    blockslice = {name: block.edges_to_indices(name, blockslice[name]) for name in blockslice}
-                    #get the flat indices from the block
-                    nextindices = block.offset+block.get_slice_indices(blockslice)
-                    #append to global list
-                    globalindices = np.append(globalindices, nextindices)
-
-            #if indices are contiguous, return a slice object, otherwise return a sorted list of indices
-            minindex = np.min(globalindices)
-            maxindex = np.max(globalindices)
-            size = maxindex - minindex + 1
-            if size == 0:
-                raise ValueError("Could not find ANY indices for slice: %s" % theslice)
-            elif size == len(globalindices):
-                result.append({
-                    'slice' : slice(minindex, maxindex + 1, 1),
-                    'edges' : theslice,
+        prev_edges = {
+            name : lower_edges[name][0] for name in axes
+        }
+        iprev = 0
+        for i in range(1, len(lower_edges[axes[0]])):
+            current_edges = {
+                name : lower_edges[name][i] for name in axes
+            }
+            if current_edges != prev_edges: # new block
+                blocks.append(slice(iprev, i))
+                blockedges.append({
+                    name : (lower_edges[name][iprev], lower_edges[name][i]) for name in axes
                 })
-            else:
-                result.append({
-                    'slice' : np.sort(globalindices),
-                    'edges' : theslice,
-                })
-        return result
+                iprev = i
+                prev_edges = current_edges
+
+        # there is a final block at the end
+        blocks.append(slice(iprev, len(lower_edges[axes[0]])))
+        blockedges.append({
+            name : (lower_edges[name][-1], upper_edges[name][-1]) for name in axes
+        })
+
+        # check for duplicated blockedges
+        for i1 in range(len(blockedges)):
+            for i2 in range(i1+1, len(blockedges)):
+                if blockedges[i1] == blockedges[i2]:
+                    raise ValueError("Binning is not contiguous! Block edges %s appear in multiple blocks." % str(blockedges[i1]))
+
+        return [
+            {
+                'slice' : blocks[i],
+                'edges' : blockedges[i]
+            } 
+            for i in range(len(blocks))
+        ]
 
 class ArbitraryGenRecoBinning:
     '''

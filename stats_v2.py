@@ -99,6 +99,21 @@ def divide_out_profile(val : np.ndarray, cov : None, binning : ArbitraryBinning,
     ...
 
 def divide_out_profile(val : np.ndarray, cov : np.ndarray | None, binning : ArbitraryBinning, axes : List[str]):
+    if len(axes) == 0:
+        # do a global operation
+        meanval = np.mean(val)
+        if meanval == 0:
+            raise ValueError("Mean value is zero, cannot divide out profile!")
+        shapes = val / meanval
+        if cov is not None:
+            covshapes = cov / (meanval * meanval)
+            covshapes += np.outer(shapes, shapes) / (meanval * meanval) * np.sum(cov)
+            covshapes -= np.outer(shapes/(meanval * meanval), np.sum(cov, axis=0))
+            covshapes -= np.outer(np.sum(cov, axis=1), shapes/(meanval * meanval))
+            return shapes, covshapes
+        else:
+            return shapes
+    
     fluxes, shapes, _ = binning.get_fluxes_shapes(val, axes)
     blocks = binning.get_blocks(axes)
     lenfactor = np.empty_like(shapes)
@@ -124,13 +139,28 @@ def normalize_per_block(val : np.ndarray, cov : None, binning : ArbitraryBinning
     ...
 
 def normalize_per_block(val : np.ndarray, cov : np.ndarray | None, binning : ArbitraryBinning, axes : List[str]):
-    fluxes, shapes, _ = binning.get_fluxes_shapes(val, axes)
-
-    if cov is not None:
-        _, covshapes, _ = binning.get_fluxes_shapes_cov2d(fluxes, shapes, cov,  axes)
-        return shapes, covshapes
+    if len(axes) == 0:
+        # do a global operation
+        sumval = np.sum(val)
+        if sumval == 0:
+            raise ValueError("Sum value is zero, cannot normalize!")
+        shapes = val / sumval
+        if cov is not None:
+            covshapes = cov / (sumval * sumval)
+            covshapes += np.outer(shapes, shapes) / (sumval * sumval) * np.sum(cov)
+            covshapes -= np.outer(shapes/(sumval * sumval), np.sum(cov, axis=0))
+            covshapes -= np.outer(np.sum(cov, axis=1), shapes/(sumval * sumval))
+            return shapes, covshapes
+        else:
+            return shapes
     else:
-        return shapes
+        fluxes, shapes, _ = binning.get_fluxes_shapes(val, axes)
+
+        if cov is not None:
+            _, covshapes, _ = binning.get_fluxes_shapes_cov2d(fluxes, shapes, cov,  axes)
+            return shapes, covshapes
+        else:
+            return shapes
 
 def _transform_and_decompose(matrix : np.ndarray):
     import fasteigenpy as eigen
