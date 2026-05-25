@@ -307,7 +307,7 @@ class _BinningBlock:
 
         edges = self.ax_details[name]['edges']
         for i, e in enumerate(edges):
-            if np.abs(e-edge) < 1e-5 or e == edge: #== for inf values
+            if e == edge or np.abs(e-edge) < 1e-5: #== for inf values
                 return i
 
         print()
