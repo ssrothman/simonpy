@@ -295,21 +295,30 @@ def equal(left, right, memory_pool = None):
     ...
 
 @overload
-def and_(left : Expression, right : Expression, memory_pool : Any|None = None) -> Expression: 
+def and_kleene(left : Expression, right : Expression, memory_pool : Any|None = None) -> Expression: 
     ...
 @overload
-def and_(left : Array, right : Array, memory_pool : Any|None = None) -> Array: 
+def and_kleene(left : Array, right : Array, memory_pool : Any|None = None) -> Array: 
     ...
-def and_(left, right, memory_pool = None):
+def and_kleene(left, right, memory_pool = None):
     ...
 
 @overload
-def or_(left : Expression, right : Expression, memory_pool : Any|None = None) -> Expression: 
+def and_not_kleene(left : Expression, right : Expression, memory_pool : Any|None = None) -> Expression: 
     ...
 @overload
-def or_(left : Array, right : Array, memory_pool : Any|None = None) -> Array: 
+def and_not_kleene(left : Array, right : Array, memory_pool : Any|None = None) -> Array: 
     ...
-def or_(left, right, memory_pool = None):
+def and_not_kleene(left, right, memory_pool = None):
+    ...
+
+@overload
+def or_kleene(left : Expression, right : Expression, memory_pool : Any|None = None) -> Expression: 
+    ...
+@overload
+def or_kleene(left : Array, right : Array, memory_pool : Any|None = None) -> Array: 
+    ...
+def or_kleene(left, right, memory_pool = None):
     ...
 
 @overload
