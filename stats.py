@@ -1,4 +1,3 @@
-import fasteigenpy as eigen
 import numpy as np
 import scipy
 
@@ -45,6 +44,7 @@ def condition(x, invhess, slice_start, slice_end, values):
     H12 = Htmp0[:, slice_start:slice_end]
     H22 = invhess[slice_start:slice_end, slice_start:slice_end]
 
+    import fasteigenpy as eigen
     codH22 = eigen.CompleteOrthogonalDecomposition(H22)
 
     solved = codH22.solve(values - xkill)
@@ -120,6 +120,8 @@ def inverse_and_eigenspectrum(matrix,
                               return_sqrt=False,
                               wrt_corr=True):
     print("Computing Eigendecomposition...")
+    import fasteigenpy as eigen
+
     if wrt_corr:
         err = np.sqrt(np.diag(matrix))
         err[err == 0] = 1
@@ -218,6 +220,8 @@ def get_chi2(vals1, vals2, cov1, cov2, binning=None, cut=None, normalize=False):
     err = np.sqrt(np.diag(covdiff))
     err[err == 0] = 1
     cdiff = np.diag(1/err) @ covdiff @ np.diag(1/err)
+    import fasteigenpy as eigen
+
     codcdiff = eigen.CompleteOrthogonalDecomposition(cdiff) 
     invc = codcdiff.pseudoInverse()
     invcov = np.diag(1/err) @ invc @ np.diag(1/err)
