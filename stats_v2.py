@@ -55,6 +55,13 @@ def apply_jacobian(val : np.ndarray | None, cov : np.ndarray | None, binning : A
         if np.any(~np.isfinite(upper_edges[key])):
             raise ValueError(f"Upper edges for axis {key} contain non-finite values even after clipping!")
 
+    # apply oneminus as needed
+    for key in wrt:
+        if key.startswith('OneMinus'):
+            lower_edges[key] = 1.0 - lower_edges[key]
+            upper_edges[key] = 1.0 - upper_edges[key]
+            print("Warning: OneMinus transformation applied to axis", key)
+
     # compute bin area
     # for radial coordinates the jacobian is 
     # proportional to r^2
@@ -63,9 +70,9 @@ def apply_jacobian(val : np.ndarray | None, cov : np.ndarray | None, binning : A
     widths = {}
     for key in wrt:
         if key in radial_coords:
-            widths[key] = np.square(upper_edges[key]) - np.square(lower_edges[key])
+            widths[key] = np.abs(np.square(upper_edges[key]) - np.square(lower_edges[key]))
         else:
-            widths[key] = upper_edges[key] - lower_edges[key]
+            widths[key] = np.abs(upper_edges[key] - lower_edges[key])
 
     jacobian = np.ones(shape = (thelen,), dtype= thedtype)
     for key in wrt:

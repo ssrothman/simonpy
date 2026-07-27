@@ -1282,7 +1282,7 @@ class ArbitraryBinning:
         :rtype: Tuple[ndarray[Any, Any], ArbitraryBinning]
         '''
         #for consistency check conservation of total sum
-        startsum = data.sum(axis=None)
+        startsum = np.nansum(data, axis=None)
 
         #result array
         result = np.empty((0, *data.shape[1:]), dtype=data.dtype)
@@ -1290,7 +1290,11 @@ class ArbitraryBinning:
         #new binning object
         newbinning = ArbitraryBinning()
         newbinning._axis_names = self._axis_names.copy()
-        newbinning._axis_names.remove(axis_name)
+        try:
+            newbinning._axis_names.remove(axis_name)
+        except ValueError:
+            raise ValueError(f"Axis {axis_name} not found in binning. Available axes: {self._axis_names}")
+        
         newbinning._Nax = self._Nax - 1
 
         #get new data and new blocks
@@ -1325,7 +1329,7 @@ class ArbitraryBinning:
                     result[-newblocks[i].total_size:] += newdata[j]
                     used[j] = True
 
-        endsum = result.sum(axis=None)
+        endsum = np.nansum(result, axis=None)
         if not np.isclose(startsum, endsum):
             raise ValueError(f"Projection changed the sum of the data: {startsum} -> {endsum}")
 
@@ -1382,7 +1386,7 @@ class ArbitraryBinning:
             raise ValueError("Rebinning specification must be a dictionary or a path to a JSON file.")
 
         #for consistency check conservation of total sum
-        startsum = data.sum(axis=None)
+        startsum = np.nansum(data, axis=None)
 
         #check consistency of inputs
         for i, specblock in enumerate(rebinning_spec['spec']):
@@ -1416,7 +1420,7 @@ class ArbitraryBinning:
         else:
             newbinning._label_lookup = None
 
-        endsum = result.sum(axis=None)
+        endsum = np.nansum(result, axis=None)
 
         if not np.isclose(startsum, endsum):
             raise ValueError(f"Rebinning changed the sum of the data: {startsum} -> {endsum}")
@@ -1659,7 +1663,7 @@ class ArbitraryBinning:
         # the order low-key matters here...
         # I guess we rely on the user to provide the axes in the right order
         if not all(axis in self._axis_names for axis in axes):
-            raise ValueError("Requested axes not all present in binning!")
+            raise ValueError("Requested axes not all present in binning! Reqested {}, present {}".format(axes, self._axis_names))
 
         # Step 1: get all the relevant edges
         lower_edges = self.lower_edges()
